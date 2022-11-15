@@ -1,7 +1,21 @@
+#
+#  ____            __  __ _      _
+# |  _ \  __ _ ___|  \/  (_) ___(_)_ __   __ _
+# | | | |/ _` / __| |\/| | |/ __| | '_ \ / _` |
+# | |_| | (_| \__ \ |  | | | (__| | | | | (_| |
+# |____/ \__,_|___/_|  |_|_|\___|_|_| |_|\__,_|
+#
+# Written by: Michael Ronzetti NIH/NCATS 2022
+#
+# Sorts out compound list to maximize difference in molecular weights of a screening run.
 library(tidyverse)
+library(ggthemes)
 
+# Import a csv file with sample id and molecular weight column (as 'MW')
 df <- read.csv(file = './data/proteaselib.csv')
-numInGroup <- 20
+
+# Specify the number of smolecules per group here.
+numInGroup <- 40
 
 # Sort the entire list by MW in ascending order
 df <- arrange(df, MW)
@@ -26,15 +40,25 @@ splitDF <- split(df, df$groupID, drop = false)
 
 # Add NA to last row to equalize row numbers
 for (x in 1:length(splitDF)) {
-  if(nrow(splitDF[[x]]) < numInGroup)
-    splitDF[[x]][nrow(splitDF[[x]])+1,] <- NA
+  if (nrow(splitDF[[x]]) < numInGroup)
+    splitDF[[x]][nrow(splitDF[[x]]) + 1,] <- NA
 }
 
 # Plot out MWs vs. group ID as confirmation
 df$groupID <- as.factor(df$groupID)
 ggplot(df, aes(x = groupID, y = MW)) +
-  geom_boxplot() +
-  geom_point()
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(size = 2, shape = 21, aes(fill = groupID)) +
+  theme_clean() +
+  theme(legend.position = 'none') +
+  labs(title = 'AS-MS Compound Splitting')
+
+ggsave(
+  'compound_split.png',
+  dpi = 600,
+  scale = 2,
+  plot = last_plot()
+)
 
 # Write out csv file for CoMa
-write.csv(splitDF, './splitDF.csv', na="")
+write.csv(splitDF, './splitDF.csv', na = "")
