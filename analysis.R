@@ -51,9 +51,13 @@ all.plot <-
   geom_point(shape = 21, size = 4) +
   scale_fill_colorblind() +
   ylim(0, 100) +
-  labs(title = 'ASMS Output',
-       x = 'Sample Name',
-       y = 'Fraction (%)') +
+  labs(
+    title = 'ASMS Output',
+    subtitle = 'All Fractions',
+    x = 'Sample Name',
+    y = 'Fraction (%)'
+  ) +
+  theme_clean() +
   theme(axis.text.x = element_text(
     angle = 60,
     vjust = 1,
@@ -74,12 +78,36 @@ bind.plot <-
   geom_point(shape = 21, size = 4) +
   scale_fill_colorblind() +
   ylim(0, 100) +
-  labs(title = 'ASMS Output',
-       x = 'Sample Name',
-       y = 'Fraction (%)') +
+  labs(
+    title = 'ASMS Output',
+    subtitle = 'Binding Fractions',
+    x = 'Sample Name',
+    y = 'Fraction (%)'
+  ) +
+  theme_clean() +
   theme(axis.text.x = element_text(
     angle = 60,
     vjust = 1,
     hjust = 1
   ))
 bind.plot
+
+eff.plot <-
+  ggplot(df.bindingEff, aes(x = sample.Name, y = bindingEff)) + geom_point(shape = 21,
+                                                                           fill = 'blue',
+                                                                           size = 4) +
+  labs(title = 'ASMS Output',
+       subtitle = 'Binding Efficiency') +
+  theme_clean() +
+  theme(axis.text.x = element_text(
+    angle = 60,
+    vjust = 1,
+    hjust = 1
+  )) +
+  labs(
+    title = 'ASMS Output',
+    subtitle = 'Binding Efficiency',
+    x = 'Sample Name',
+    y = 'Fraction (%)'
+  )
+eff.plot
