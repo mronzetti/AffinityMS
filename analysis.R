@@ -10,6 +10,7 @@
 
 library(tidyverse)
 library(ggthemes)
+library(cowplot)
 
 # Read in raw df
 raw.df <- read.csv(file = 'data/asms_data.csv')
@@ -69,28 +70,26 @@ df.prism$Sample.ID <-
 
 # Export the Prism df as a csv
 write.csv(x = df.prism,
-          file = './ASMSPrism.csv',
+          file = './output/ASMSPrism.csv',
           row.names = FALSE)
 
 # Graph ASMS output
 # Plot all data points
 all.plot <-
   ggplot(df.clean, aes(x = Sample.Name, y = Fraction, fill = Sample.ID)) +
-  geom_point(shape = 21, size = 4) +
+  geom_point(shape = 21, size = 2) +
   scale_fill_colorblind() +
   ylim(0, 100) +
-  labs(
-    title = 'ASMS Output',
-    subtitle = 'All Fractions',
-    x = 'Sample Name',
-    y = 'Fraction (%)'
-  ) +
+  labs(title = 'ASMS Output',
+       subtitle = 'All Fractions',
+       y = 'Fraction (%)') +
   theme_clean() +
   theme(axis.text.x = element_text(
     angle = 60,
     vjust = 1,
     hjust = 1
-  ))
+  ),
+  axis.title.x = element_blank())
 all.plot
 
 # Plot of elution and unbound
@@ -103,21 +102,19 @@ bind.plot <-
     ),
     aes(x = Sample.Name, y = Fraction, fill = Sample.ID)
   ) +
-  geom_point(shape = 21, size = 4) +
+  geom_point(shape = 21, size = 2) +
   scale_fill_colorblind() +
   ylim(0, 100) +
-  labs(
-    title = 'ASMS Output',
-    subtitle = 'Binding Fractions',
-    x = 'Sample Name',
-    y = 'Fraction (%)'
-  ) +
+  labs(title = 'ASMS Output',
+       subtitle = 'Binding Fractions',
+       y = 'Fraction (%)') +
   theme_clean() +
   theme(axis.text.x = element_text(
     angle = 60,
     vjust = 1,
     hjust = 1
-  ))
+  ),
+  axis.title.x = element_blank())
 bind.plot
 
 # Plot the ASMS Binding Efficiency
@@ -132,11 +129,17 @@ eff.plot <-
     angle = 60,
     vjust = 1,
     hjust = 1
-  )) +
-  labs(
-    title = 'ASMS Output',
-    subtitle = 'Binding Efficiency',
-    x = 'Sample Name',
-    y = 'Fraction (%)'
-  )
+  ),
+  axis.title.x = element_blank()) +
+  labs(title = 'ASMS Output',
+       subtitle = 'Binding Efficiency',
+       y = 'Efficiency')
 eff.plot
+
+# Cowplot these together
+fractionsLeft <- plot_grid(all.plot, bind.plot, ncol = 1)
+fractionsPlot <- plot_grid(fractionsLeft, eff.plot, nrow = 1)
+fractionsPlot
+
+# Save fraction cowplot to output folder
+ggsave(filename = './output/fractionsPlot.png', plot = fractionsPlot, dpi = 'retina', scale = 2)
