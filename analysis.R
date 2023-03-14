@@ -17,14 +17,15 @@ raw.df <- read.csv(file = 'data/asms_data.csv')
 # Convert fraction from chr to numeric
 raw.df$Fraction <- gsub('%', '', raw.df$Fraction)
 raw.df$Fraction <- as.numeric(raw.df$Fraction)
-raw.df$Sample.Name <- as.factor(raw.df$Sample.Name)
-raw.df$Sample.ID <- as.factor(raw.df$Sample.ID)
+raw.df$Sample.Name <- as.character(raw.df$Sample.Name)
+raw.df$Sample.ID <- as.character(raw.df$Sample.ID)
 
 # Group by sample name, now using df.clean
 df.clean <- raw.df %>%
   group_by(Sample.Name)
 
 # Calculate binding efficiency
+# Defined as (Elution fraction)/(Rest of fractions)
 df.bindingEff <-
   tibble(sample.Name = unique(df.clean$Sample.Name),
          bindingEff = as.numeric(0))
@@ -42,8 +43,35 @@ for (x in 1:nrow(df.bindingEff)) {
     df.clean$Analyte.Area[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
                             df.clean$Sample.ID == "Unbound"]
   df.bindingEff$bindingEff[x] <- elution / (wash1 + wash2 + unbound)
-  
 }
+
+# Prepare a df that is in wide format for Prism input
+# Working with two grouping variables.
+df.prism <-
+  pivot_wider(
+    data = df.clean,
+    names_from = Sample.Name,
+    values_from = Analyte.Area,
+    id_cols = Sample.ID
+  )
+
+# Widen the binding efficiency tables
+df.bindingEff.Temp <-
+  pivot_wider(data = df.bindingEff,
+              names_from = sample.Name,
+              values_from = bindingEff)
+
+# Attach the Binding Efficiency row and rename the NA
+df.prism <- df.prism %>%
+  add_row(df.bindingEff.Temp)
+df.prism$Sample.ID <-
+  df.prism$Sample.ID %>% replace_na("BindingEff")
+
+# Export the Prism df as a csv
+write.csv(x = df.prism,
+          file = './ASMSPrism.csv',
+          row.names = FALSE)
+
 # Graph ASMS output
 # Plot all data points
 all.plot <-
@@ -92,6 +120,7 @@ bind.plot <-
   ))
 bind.plot
 
+# Plot the ASMS Binding Efficiency
 eff.plot <-
   ggplot(df.bindingEff, aes(x = sample.Name, y = bindingEff)) + geom_point(shape = 21,
                                                                            fill = 'blue',
