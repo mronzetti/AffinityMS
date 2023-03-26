@@ -8,6 +8,8 @@
 # To Do
 #  2x2 graph of ASMS output by fraction area and percentage
 
+# Need to Do: Raw Area, change efficiency to % in elution.
+
 library(tidyverse)
 library(ggthemes)
 library(cowplot)
@@ -32,16 +34,16 @@ df.bindingEff <-
          bindingEff = as.numeric(0))
 for (x in 1:nrow(df.bindingEff)) {
   elution <-
-    df.clean$Analyte.Area[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
+    df.clean$Fraction[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
                             df.clean$Sample.ID == "Bound/Elution"]
   wash1 <-
-    df.clean$Analyte.Area[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
+    df.clean$Fraction[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
                             df.clean$Sample.ID == "Wash1"]
   wash2 <-
-    df.clean$Analyte.Area[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
+    df.clean$Fraction[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
                             df.clean$Sample.ID == "Wash2"]
   unbound <-
-    df.clean$Analyte.Area[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
+    df.clean$Fraction[df.clean$Sample.Name == df.bindingEff$sample.Name[x] &
                             df.clean$Sample.ID == "Unbound"]
   df.bindingEff$bindingEff[x] <- elution / (wash1 + wash2 + unbound)
 }
