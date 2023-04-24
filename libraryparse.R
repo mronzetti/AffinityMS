@@ -112,10 +112,13 @@ echo.df <- master.df %>%
   rename('Destination Well' = wellID) %>%
   mutate('Source Plate Type' = echoDispType)
 
+# Remove leading zeros from the Source Well column
+echo.df$`Source Well` <- gsub("(?<=[A-Za-z])0+(?=[0-9])", "", echo.df$`Source Well`, perl = TRUE)
+
 # Export the ECHO df
 write.csv(x = echo.df, file = './output/echodispense.csv', row.names = FALSE)
 
-# Split the df according to group ID
+# Sp  lit the df according to group ID
 splitDF <- split(df, df$groupID, drop = false)
 
 # Add NA to last row to equalize row numbers
