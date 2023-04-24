@@ -134,11 +134,11 @@ ggplot(df, aes(x = groupID, y = mass)) +
   labs(title = 'AS-MS Compound Splitting')
 
 ggsave(
-  'compound_split.png',
+  './output/compound_split.png',
   dpi = 600,
   scale = 2.5,
   plot = last_plot()
 )
 
 # Write out csv file for CoMa
-write.csv(splitDF, './splitDF.csv', na = "")
+write.csv(splitDF, './output/splitDF.csv', na = "")
