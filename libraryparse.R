@@ -14,20 +14,21 @@ library(rcdk)
 library(readxl)
 
 # Parameters for library parsing
-# 
-# numInGroup = number of compounds per well
-# echoDispVol = dispense volume on Echo (nL)
+#
+#   numInGroup = number of compounds per well
+#   echoDispVol = dispense volume on Echo (nL)
+#
 numInGroup <- 10
-echoDispVol <- 8
+echoDispVol <- 20
 echoDispType <- '1536LDV_DMSO'
 
 # Import a csv file with sample id and smiles
 raw.df <- read_xlsx(path = './data/protease_compoundlist.xlsx')
 
 # Comment previous line and uncomment this to specify groups by plate size.
-#numSmolecules <- nrow(df)
-#plateWells <- 30
-#numInGroup <- round(numSmolecules / plateWells, digits = 0)
+# numSmolecules <- nrow(df)
+# plateWells <- 30
+# numInGroup <- round(numSmolecules / plateWells, digits = 0)
 
 # Setup df to store values
 result.df <-
@@ -44,28 +45,35 @@ for (x in 1:nrow(raw.df)) {
     cat("Warning: Missing SMILES data at row", x, "\n")
     formula <- NA
     mass <- 1
-    sample.df <- data.frame(sample.id = raw.df$sample.id[x],
-                            formula = formula,
-                            mass = mass)
+    sample.df <- data.frame(
+      sample.id = raw.df$sample.id[x],
+      formula = formula,
+      mass = mass
+    )
   } else {
     sp <- get.smiles.parser()
-    molecule.test <- parse.smiles(smiles = raw.df$smiles[x], kekulise = FALSE)[[1]]
+    molecule.test <-
+      parse.smiles(smiles = raw.df$smiles[x], kekulise = FALSE)[[1]]
     convert.implicit.to.explicit(molecule.test)
     formula <- get.mol2formula(molecule.test, charge = 0)
-    message(paste(
-      raw.df$sample.id[x],
-      ' at row: ',
-      x,
-      '; formula: ',
-      formula@string,
-      '; mass: ',
-      formula@mass,
-      '\n',
-      sep = ''
-    ))
-    sample.df <- data.frame(sample.id = raw.df$sample.id[x],
-                            formula = formula@string,
-                            mass = formula@mass)
+    message(
+      paste(
+        raw.df$sample.id[x],
+        ' at row: ',
+        x,
+        '; formula: ',
+        formula@string,
+        '; mass: ',
+        formula@mass,
+        '\n',
+        sep = ''
+      )
+    )
+    sample.df <- data.frame(
+      sample.id = raw.df$sample.id[x],
+      formula = formula@string,
+      mass = formula@mass
+    )
   }
   result.df <- rbind(result.df, sample.df)
 }
@@ -88,7 +96,7 @@ for (x in 1:nrow(df)) {
     groupCount = 1
 }
 
-# Export a master file with addresses
+# Construct a master file with addresses
 master.df <- inner_join(raw.df, df)
 master.df <- master.df %>% arrange(master.df$groupID)
 
@@ -99,10 +107,56 @@ wellIDs <- paste0(LETTERS[1:8], rep(1:12, each = 8))
 unique_groups <- unique(master.df$groupID)
 wellIDs_group <- wellIDs[1:length(unique_groups)]
 names(wellIDs_group) <- unique_groups
-master.df$wellID <- wellIDs_group[match(master.df$groupID, names(wellIDs_group))]
+master.df$wellID <-
+  wellIDs_group[match(master.df$groupID, names(wellIDs_group))]
+
+# Remove leading zeros from the Source Well column
+master.df$source.well <-
+  gsub("(?<=[A-Za-z])0+(?=[0-9])", "", master.df$source.well, perl = TRUE)
 
 # Export the master df
-write.csv(x = master.df, file = './output/masterList.csv', row.names = FALSE)
+write.csv(x = master.df,
+          file = './output/masterList.csv',
+          row.names = FALSE)
+
+# Assuming your data frame is named 'my_df'
+# Split the data frame by 'wellID' into a list of data frames
+filtered.df <- master.df %>%
+  select(sample.id, formula, wellID)
+split_df <- split(filtered.df, filtered.df$wellID)
+
+# Function to reshape the sub-data frames
+reshape_sub_df <- function(df) {
+  well_id <- unique(df$wellID)
+  df <- df %>%
+    mutate(row_num = row_number()) %>%
+    pivot_wider(names_from = row_num, 
+                values_from = c(sample.id, formula), 
+                names_sep = " ") %>%
+    select(-wellID) %>%
+    add_column(wellID = well_id, .before = 1)
+  return(df)
+}
+
+# Apply the function to each sub-data frame in the list
+reshaped_sub_dfs <- lapply(split_df, reshape_sub_df)
+
+# Merge the reshaped data frames back together
+result_df <- bind_rows(reshaped_sub_dfs)
+
+# Generate the desired column order
+num_pairs <- 10
+col_order <- c("wellID", 
+               unlist(lapply(1:num_pairs, function(i) c(paste("sample.id", i), paste("formula", i)))))
+
+# Arrange columns in the desired order
+result_df <- result_df %>% select(all_of(col_order))
+
+# Print the result
+print(result_df)
+
+# Export compound list
+write.csv(x = result_df, file = './output/wideDF.csv')
 
 # Create ECHO file for dispense
 echo.df <- master.df %>%
@@ -113,12 +167,15 @@ echo.df <- master.df %>%
   mutate('Source Plate Type' = echoDispType)
 
 # Remove leading zeros from the Source Well column
-echo.df$`Source Well` <- gsub("(?<=[A-Za-z])0+(?=[0-9])", "", echo.df$`Source Well`, perl = TRUE)
+echo.df$`Source Well` <-
+  gsub("(?<=[A-Za-z])0+(?=[0-9])", "", echo.df$`Source Well`, perl = TRUE)
 
 # Export the ECHO df
-write.csv(x = echo.df, file = './output/echodispense.csv', row.names = FALSE)
+write.csv(x = echo.df,
+          file = './output/echodispense.csv',
+          row.names = FALSE)
 
-# Sp  lit the df according to group ID
+# Split the df according to group ID
 splitDF <- split(df, df$groupID, drop = false)
 
 # Add NA to last row to equalize row numbers
