@@ -13,7 +13,6 @@ library(ggthemes)
 library(rcdk)
 library(readxl)
 
-
 # Parameters for library parsing
 #
 #   numInGroup = number of compounds per well
