@@ -210,7 +210,7 @@ ggplot(df, aes(x = groupID, y = mass)) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(size = 2, shape = 21, aes(fill = groupID)) +
   theme_clean() +
-  theme(legend.position = 'none', axis.text = element_text(size = 4)) +
+  theme(legend.position = 'none', axis.text = element_text(size = 8)) +
   labs(title = 'AS-MS Compound Splitting')
 
 ggsave(
