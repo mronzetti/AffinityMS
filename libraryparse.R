@@ -13,22 +13,21 @@ library(ggthemes)
 library(rcdk)
 library(readxl)
 
-# Parameters for library parsing
+#   Parameters for library parsing
 #
 #   numInGroup = number of compounds per well
 #   echoDispVol = dispense volume on Echo (nL)
+#   numControlWells = # of wells to leave empty for controls
+#   numTotalWells = Plate format for experiment
 #
 numInGroup <- 10
 echoDispVol <- 20
 echoDispType <- '1536LDV_DMSO'
+numControlWells <- 3
+numTotalWells <- 96
 
 # Import a csv file with sample id and smiles
-raw.df <- read_xlsx(path = './data/protease_compoundlist.xlsx')
-
-# Comment previous line and uncomment this to specify groups by plate size.
-# numSmolecules <- nrow(df)
-# plateWells <- 30
-# numInGroup <- round(numSmolecules / plateWells, digits = 0)
+raw.df <- read_xlsx(path = './data/AID_complete.xlsx')
 
 # Setup df to store values
 result.df <-
@@ -96,19 +95,41 @@ for (x in 1:nrow(df)) {
     groupCount = 1
 }
 
+# Calculate the maximum number of groups that can be placed on a single plate
+groupsPerPlate <- numTotalWells - numControlWells
+
+# Create 'destination.plate' column
+df$destination.plate <- ceiling(df$groupID / groupsPerPlate)
+df$destination.plate <-
+  paste0("Plate", sprintf("%03d", df$destination.plate))
+
 # Construct a master file with addresses
 master.df <- inner_join(raw.df, df)
-master.df <- master.df %>% arrange(master.df$groupID)
+master.df <-
+  master.df %>% arrange(master.df$groupID, master.df$destination.plate)
 
-# create a vector of well IDs for a 96-well plate
+# Create a vector of well IDs
 wellIDs <- paste0(LETTERS[1:8], rep(1:12, each = 8))
+wellIDs <- wellIDs[1:groupsPerPlate]
 
-# assign a unique well ID to each unique groupID
-unique_groups <- unique(master.df$groupID)
-wellIDs_group <- wellIDs[1:length(unique_groups)]
-names(wellIDs_group) <- unique_groups
-master.df$wellID <-
-  wellIDs_group[match(master.df$groupID, names(wellIDs_group))]
+# Assign a unique well ID to each unique groupID within each plate
+unique_plates <- unique(df$destination.plate)
+wellIDs_all <- character()
+for (plate in unique_plates) {
+  df_plate <- df[df$destination.plate == plate, ]
+  unique_groups_plate <- unique(df_plate$groupID)
+  wellIDs_group <- wellIDs[1:length(unique_groups_plate)]
+  names(wellIDs_group) <- paste(plate, unique_groups_plate, sep = "_")
+  wellIDs_all <- c(wellIDs_all, wellIDs_group)
+}
+
+df$wellID <-
+  wellIDs_all[paste(df$destination.plate, df$groupID, sep = "_")]
+
+# Construct a master file with addresses
+master.df <- inner_join(raw.df, df)
+master.df <-
+  master.df %>% arrange(master.df$groupID, master.df$destination.plate)
 
 # Remove leading zeros from the Source Well column
 master.df$source.well <-
@@ -130,9 +151,11 @@ reshape_sub_df <- function(df) {
   well_id <- unique(df$wellID)
   df <- df %>%
     mutate(row_num = row_number()) %>%
-    pivot_wider(names_from = row_num, 
-                values_from = c(sample.id, formula), 
-                names_sep = " ") %>%
+    pivot_wider(
+      names_from = row_num,
+      values_from = c(sample.id, formula),
+      names_sep = " "
+    ) %>%
     select(-wellID) %>%
     add_column(wellID = well_id, .before = 1)
   return(df)
@@ -146,8 +169,11 @@ result_df <- bind_rows(reshaped_sub_dfs)
 
 # Generate the desired column order
 num_pairs <- 10
-col_order <- c("wellID", 
-               unlist(lapply(1:num_pairs, function(i) c(paste("sample.id", i), paste("formula", i)))))
+col_order <- c("wellID",
+               unlist(lapply(1:num_pairs, function(i)
+                 c(
+                   paste("sample.id", i), paste("formula", i)
+                 ))))
 
 # Arrange columns in the desired order
 result_df <- result_df %>% select(all_of(col_order))
@@ -160,11 +186,14 @@ write.csv(x = result_df, file = './output/wideDF.csv')
 
 # Create ECHO file for dispense
 echo.df <- master.df %>%
-  select(sample.id, source.well, wellID) %>%
+  select(sample.id, source.well, wellID, plate.id, destination.plate) %>%
   mutate('Transfer Volume' = echoDispVol) %>%
   rename('Source Well' = source.well) %>%
   rename('Destination Well' = wellID) %>%
-  mutate('Source Plate Type' = echoDispType)
+  rename('Destination Plate' = destination.plate) %>%
+  mutate('Source Plate Type' = echoDispType) %>%
+  mutate('Source Plate' = plate.id) %>%
+  select(-plate.id)
 
 # Remove leading zeros from the Source Well column
 echo.df$`Source Well` <-
@@ -174,15 +203,6 @@ echo.df$`Source Well` <-
 write.csv(x = echo.df,
           file = './output/echodispense.csv',
           row.names = FALSE)
-
-# Split the df according to group ID
-splitDF <- split(df, df$groupID, drop = false)
-
-# Add NA to last row to equalize row numbers
-for (x in 1:length(splitDF)) {
-  if (nrow(splitDF[[x]]) < numInGroup)
-    splitDF[[x]][nrow(splitDF[[x]]) + 1,] <- NA
-}
 
 # Plot out MWs vs. group ID as confirmation
 df$groupID <- as.factor(df$groupID)
@@ -199,6 +219,3 @@ ggsave(
   scale = 2.5,
   plot = last_plot()
 )
-
-# Write out csv file for CoMa
-write.csv(splitDF, './output/splitDF.csv', na = "")
