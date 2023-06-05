@@ -7,7 +7,28 @@
 #
 # Written by: Michael Ronzetti NIH/NCATS 2022
 #
-# Sorts out compound list to maximize difference in molecular weights of a screening run.
+#   To Do
+#
+#   Control plate export: DMSO backfill address and volume, control well address
+#   Need to make compatible for Nate's analysis (wait for Sam meeting)
+#
+# Sorts out compound list to maximize difference in molecular weights of a screening run, generates
+#   exportable ECHO file, control compound dispense file 
+
+# List of packages to check/install
+packages <- c("tidyverse", "ggthemes", "rcdk", "readxl")
+
+# Function to check if a package is installed
+is_package_installed <- function(package_name) {
+  is.element(package_name, installed.packages()[, "Package"])
+}
+
+# Iterate over the packages and install if not installed
+for (package in packages) {
+  if (!is_package_installed(package)) {
+    install.packages(package)
+  }
+}
 library(tidyverse)
 library(ggthemes)
 library(rcdk)
@@ -17,28 +38,30 @@ library(readxl)
 #
 #   numInGroup = number of compounds per well
 #   echoDispVol = dispense volume on Echo (nL)
+#   echoDispType = Type of dispensing protocol
 #   numControlWells = # of wells to leave empty for controls
 #   numTotalWells = Plate format for experiment
 #
 numInGroup <- 10
 echoDispVol <- 20
 echoDispType <- '1536LDV_DMSO'
-numControlWells <- 3
+numControlWells <- 5
 numTotalWells <- 96
 
-# Import a csv file with sample id and smiles
+# Import csv file with sample id and smiles
+# Requires:
+#   plate.id, source.well,sample.id, smiles
 raw.df <- read_xlsx(path = './data/AID_complete.xlsx')
 
-# Setup df to store values
+# Setup result.df to store compound values
 result.df <-
   data.frame(sample.id = character(),
              formula = character(),
              mass = numeric())
 
-# Calculate the molecular formula and molecular weight with rcdk package
+# Calculate the molecular formula and molecular weight with rcdk package for each
 for (x in 1:nrow(raw.df)) {
   smiles_string <- raw.df$smiles[x]
-  
   # Check if smiles value is NULL, if so, assign NA to columns
   if (is.null(smiles_string) | smiles_string == 'null') {
     cat("Warning: Missing SMILES data at row", x, "\n")
@@ -55,19 +78,19 @@ for (x in 1:nrow(raw.df)) {
       parse.smiles(smiles = raw.df$smiles[x], kekulise = FALSE)[[1]]
     convert.implicit.to.explicit(molecule.test)
     formula <- get.mol2formula(molecule.test, charge = 0)
-    message(
-      paste(
-        raw.df$sample.id[x],
-        ' at row: ',
-        x,
-        '; formula: ',
-        formula@string,
-        '; mass: ',
-        formula@mass,
-        '\n',
-        sep = ''
-      )
-    )
+    # message(
+    #   paste(
+    #     raw.df$sample.id[x],
+    #     ' at row: ',
+    #     x,
+    #     '; formula: ',
+    #     formula@string,
+    #     '; mass: ',
+    #     formula@mass,
+    #     '\n',
+    #     sep = ''
+    #   )
+    # )
     sample.df <- data.frame(
       sample.id = raw.df$sample.id[x],
       formula = formula@string,
@@ -109,8 +132,8 @@ master.df <-
   master.df %>% arrange(master.df$groupID, master.df$destination.plate)
 
 # Create a vector of well IDs
-wellIDs <- paste0(LETTERS[1:8], rep(1:12, each = 8))
-wellIDs <- wellIDs[1:groupsPerPlate]
+fullplatewellIDs <- paste0(LETTERS[1:8], rep(1:12, each = 8))
+wellIDs <- fullplatewellIDs[1:groupsPerPlate]
 
 # Assign a unique well ID to each unique groupID within each plate
 unique_plates <- unique(df$destination.plate)
@@ -119,7 +142,8 @@ for (plate in unique_plates) {
   df_plate <- df[df$destination.plate == plate, ]
   unique_groups_plate <- unique(df_plate$groupID)
   wellIDs_group <- wellIDs[1:length(unique_groups_plate)]
-  names(wellIDs_group) <- paste(plate, unique_groups_plate, sep = "_")
+  names(wellIDs_group) <-
+    paste(plate, unique_groups_plate, sep = "_")
   wellIDs_all <- c(wellIDs_all, wellIDs_group)
 }
 
@@ -219,3 +243,22 @@ ggsave(
   scale = 2.5,
   plot = last_plot()
 )
+
+# # # # # # # # # #
+# Count the number of compounds in each well
+compounds_per_well <- df %>%
+  group_by(wellID, destination.plate) %>%
+  summarise(numCompounds = n(), .groups = "keep")
+
+# Identify wells with fewer than numInGroup compounds, filter, and find DMSO backfill amount
+compounds_per_well$needControl <- compounds_per_well$numCompounds < numInGroup
+backfill_wells <- filter(compounds_per_well, needControl == TRUE) %>%
+  mutate(backfillAmount = (numInGroup-numCompounds)*echoDispVol) %>%
+  select(!c(needControl, numCompounds))
+
+# Identify which wells are unused and for control compound
+control_wells <- fullplatewellIDs[!fullplatewellIDs %in% wellIDs]
+message(control_wells)
+
+# Export control dispense dataframe
+write.csv(x = backfill_wells, file = './output/control_dispense.csv', row.names = FALSE)
