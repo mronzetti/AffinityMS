@@ -125,7 +125,7 @@ wellIDs <- fullplatewellIDs[1:groupsPerPlate]
 unique_plates <- unique(df$destination.plate)
 wellIDs_all <- character()
 for (plate in unique_plates) {
-  df_plate <- df[df$destination.plate == plate,]
+  df_plate <- df[df$destination.plate == plate, ]
   unique_groups_plate <- unique(df_plate$groupID)
   wellIDs_group <- wellIDs[1:length(unique_groups_plate)]
   names(wellIDs_group) <-
@@ -191,17 +191,17 @@ result_df <- result_df %>% select(all_of(col_order))
 print(result_df)
 
 # Export compound list
-write.csv(x = result_df, file = './output/wideDF.csv')
+write.csv(x = result_df, file = './output/wideDF.csv', quote = FALSE)
 
 # Create ECHO file for dispense
 echo.df <- master.df %>%
   select(sample.id, source.well, wellID, plate.id, destination.plate) %>%
-  mutate('Transfer Volume' = echoDispVol) %>%
+  mutate('Transfer Volume' = as.integer(echoDispVol)) %>%
   rename('Source Well' = source.well) %>%
   rename('Destination Well' = wellID) %>%
-  rename('Destination Plate' = destination.plate) %>%
-  mutate('Source Plate Type' = echoDispType) %>%
-  mutate('Source Plate' = plate.id) %>%
+  rename('Destination Plate Name' = destination.plate) %>%
+  mutate('Source Plate Type' = as.character(echoDispType)) %>%
+  mutate('Source Plate Name' = as.character(plate.id)) %>%
   select(-plate.id)
 
 # Remove leading zeros from the Source Well column
@@ -209,9 +209,12 @@ echo.df$`Source Well` <-
   gsub("(?<=[A-Za-z])0+(?=[0-9])", "", echo.df$`Source Well`, perl = TRUE)
 
 # Export the ECHO df
-write.csv(x = echo.df,
-          file = './output/echodispense.csv',
-          row.names = FALSE)
+write.csv(
+  x = echo.df,
+  file = './output/echodispense.csv',
+  row.names = FALSE,
+  quote = FALSE
+)
 
 # Plot out MWs vs. group ID as confirmation
 df$groupID <- as.factor(df$groupID)
@@ -222,12 +225,12 @@ ggplot(df, aes(x = groupID, y = mass)) +
   theme(legend.position = 'none', axis.text = element_text(size = 8)) +
   labs(title = 'AS-MS Compound Splitting')
 
-ggsave(
-  './output/compound_split.png',
-  dpi = 600,
-  scale = 2.5,
-  plot = last_plot()
-)
+# ggsave(
+#   './output/compound_split.png',
+#   dpi = 600,
+#   scale = 2.5,
+#   plot = last_plot()
+# )
 
 # # # # # # # # # #
 # Count the number of compounds in each well
@@ -248,6 +251,9 @@ control_wells <- fullplatewellIDs[!fullplatewellIDs %in% wellIDs]
 message(control_wells)
 
 # Export control dispense dataframe
-write.csv(x = backfill_wells,
-          file = './output/control_dispense.csv',
-          row.names = FALSE)
+write.csv(
+  x = backfill_wells,
+  file = './output/control_dispense.csv',
+  row.names = FALSE,
+  quote = FALSE
+)
