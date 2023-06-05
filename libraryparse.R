@@ -9,11 +9,10 @@
 #
 #   To Do
 #
-#   Control plate export: DMSO backfill address and volume, control well address
-#   Need to make compatible for Nate's analysis (wait for Sam meeting)
+#   Need to make wide form compatible for Nate's analysis (wait for Sam meeting)
 #
 # Sorts out compound list to maximize difference in molecular weights of a screening run, generates
-#   exportable ECHO file, control compound dispense file 
+#   exportable ECHO file, control compound dispense file
 
 # List of packages to check/install
 packages <- c("tidyverse", "ggthemes", "rcdk", "readxl")
@@ -78,19 +77,6 @@ for (x in 1:nrow(raw.df)) {
       parse.smiles(smiles = raw.df$smiles[x], kekulise = FALSE)[[1]]
     convert.implicit.to.explicit(molecule.test)
     formula <- get.mol2formula(molecule.test, charge = 0)
-    # message(
-    #   paste(
-    #     raw.df$sample.id[x],
-    #     ' at row: ',
-    #     x,
-    #     '; formula: ',
-    #     formula@string,
-    #     '; mass: ',
-    #     formula@mass,
-    #     '\n',
-    #     sep = ''
-    #   )
-    # )
     sample.df <- data.frame(
       sample.id = raw.df$sample.id[x],
       formula = formula@string,
@@ -139,7 +125,7 @@ wellIDs <- fullplatewellIDs[1:groupsPerPlate]
 unique_plates <- unique(df$destination.plate)
 wellIDs_all <- character()
 for (plate in unique_plates) {
-  df_plate <- df[df$destination.plate == plate, ]
+  df_plate <- df[df$destination.plate == plate,]
   unique_groups_plate <- unique(df_plate$groupID)
   wellIDs_group <- wellIDs[1:length(unique_groups_plate)]
   names(wellIDs_group) <-
@@ -164,7 +150,6 @@ write.csv(x = master.df,
           file = './output/masterList.csv',
           row.names = FALSE)
 
-# Assuming your data frame is named 'my_df'
 # Split the data frame by 'wellID' into a list of data frames
 filtered.df <- master.df %>%
   select(sample.id, formula, wellID)
@@ -251,9 +236,11 @@ compounds_per_well <- df %>%
   summarise(numCompounds = n(), .groups = "keep")
 
 # Identify wells with fewer than numInGroup compounds, filter, and find DMSO backfill amount
-compounds_per_well$needControl <- compounds_per_well$numCompounds < numInGroup
-backfill_wells <- filter(compounds_per_well, needControl == TRUE) %>%
-  mutate(backfillAmount = (numInGroup-numCompounds)*echoDispVol) %>%
+compounds_per_well$needControl <-
+  compounds_per_well$numCompounds < numInGroup
+backfill_wells <-
+  filter(compounds_per_well, needControl == TRUE) %>%
+  mutate(backfillAmount = (numInGroup - numCompounds) * echoDispVol) %>%
   select(!c(needControl, numCompounds))
 
 # Identify which wells are unused and for control compound
@@ -261,4 +248,6 @@ control_wells <- fullplatewellIDs[!fullplatewellIDs %in% wellIDs]
 message(control_wells)
 
 # Export control dispense dataframe
-write.csv(x = backfill_wells, file = './output/control_dispense.csv', row.names = FALSE)
+write.csv(x = backfill_wells,
+          file = './output/control_dispense.csv',
+          row.names = FALSE)
